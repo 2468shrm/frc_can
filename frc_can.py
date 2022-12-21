@@ -73,7 +73,7 @@ class FRCCANDevice:
 
     def update_device_type(self, device_type):
         """Updates the device type of the instance value."""
-        self.device_type = (msg_id >> self.DEVICE_TYPE_LSB) & self.DEVICE_NUMBER_MASK
+        self.device_type = (device_type >> self.DEVICE_TYPE_LSB) & self.DEVICE_NUMBER_MASK
         self.__post_init__()
 
 
