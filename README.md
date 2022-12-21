@@ -7,6 +7,8 @@ sensors to FRC robots. It is intended to simplify application creation. It runs 
 Adafruit feather boards running circuitpython, specifically the M4 CAN Express
 Feather board.
 
+NOTE: This code is experimental. Use at own risk.
+
 ## How does it help?
 
 There are two objects provided: FRCCANDevice (in frc_can.py) and CANHandler (in frc_can_handler.py). There is a third object provided, CANCarrierBoard, that
