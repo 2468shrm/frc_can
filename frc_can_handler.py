@@ -3,6 +3,7 @@ import board
 import digitalio
 import canio
 
+
 class CANHandler:
     def __init__(self, rx=board.CAN_RX, tx=board.CAN_TX,
                  matches=[],
@@ -15,20 +16,23 @@ class CANHandler:
         self.iteration_function = None
         # A table for mapping canio.Messages to a handler function
         self.handler_table = {}
-        # A table for mapping canio.RemoteTransmissionRequest to a handler function
+        # A table for mapping canio.RemoteTransmissionRequest to a
+        # handler function
         self.rtr_handler_table = {}
 
         self.can = canio.CAN(rx=self.rx, tx=self.tx, baudrate=self.baudrate)
-        self.listener = self.can.listen(matches=self.matches, timeout=self.timeout)
-        
-        # If the CAN transceiver has a standby pin, bring it out of standby mode
+        self.listener = self.can.listen(matches=self.matches,
+                                        timeout=self.timeout)
+
+        # If the CAN transceiver has a standby pin, bring it out of
+        # standby mode
         if hasattr(board, 'CAN_STANDBY'):
             self.standby = digitalio.DigitalInOut(board.CAN_STANDBY)
             self.standby.switch_to_output(False)
 
-        # If the CAN transceiver is powered by a boost converter, turn on its supply
-        # For example, the Adafruit M4 CAN Feather Express has a 3.3V to 5V boost
-        # converter that powers the CAN transceiver.
+        # If the CAN transceiver is powered by a boost converter, turn
+        # on its supply. For example, the Adafruit M4 CAN Feather Express
+        # has a 3.3V to 5V boost converter that powers the CAN transceiver.
         if hasattr(board, 'BOOST_ENABLE'):
             self.boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
             self.boost_enable.switch_to_output(True)
@@ -36,13 +40,14 @@ class CANHandler:
     def send(self, msg):
         """Sends a message. Typically used for status transmissions."""
         self.can.send(msg)
-        
+
     def register_handler(self, message_id, function):
         """Adds a function (handler) to process a message. These are added
         to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
         if message_id in self.handler_table:
-            print(f"ERROR: Attempting to add MessageID that was pre-registered")
+            print(f"ERROR: Attempting to add MessageID that was"
+                  " pre-registered")
             return
         self.handler_table[message_id] = function
 
@@ -51,7 +56,8 @@ class CANHandler:
         to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
         if message_id in self.rtr_handler_table:
-            print(f"ERROR: Attempting to add MessageID that was pre-registered")
+            print(f"ERROR: Attempting to add MessageID that was "
+                  "pre-registered")
             return
         self.rtr_handler_table[message_id] = function
 
@@ -73,7 +79,7 @@ class CANHandler:
         arrive.  Examples include sampling and processing I/Os for
         indexing, reading sensors over I2C/SPI, etc."""
         self.iteration_function = iteration_function
-    
+
     def step(self):
         """Wait for the arrival of a message or a timeout. The message
         can be a Message or a RemoteTransmissionRequest.  If one arrives,
