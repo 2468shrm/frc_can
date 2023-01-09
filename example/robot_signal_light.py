@@ -3,11 +3,12 @@ import time
 import struct
 import neopixel
 
+
 class RSL:
     # RSL frequency
     RSL_FREQ = 5
     RSL_PERIOD = 1/RSL_FREQ
-    
+
     # RSL colors
     RSL_ON = (0xff, 0x20, 0)
     RSL_OFF = (0, 0, 0)
@@ -25,8 +26,9 @@ class RSL:
 
         if self.pin:
             self.pixels = neopixel.NeoPixel(
-                self.pixel_pin, self.num_pixels, brightness=0.3, auto_write=False
-            )            
+                self.pixel_pin, self.num_pixels, brightness=0.3,
+                auto_write=False
+            )
 
     def can_heartbeat_message(self, message):
         payload = struct.unpack("BBBBBBBB", message.data)
@@ -41,7 +43,7 @@ class RSL:
             self.pixels.fill(self.RSL_OFF)
             self.pixels.show()
         else:
-            _now = time.time() 
+            _now = time.time()
             if _now > (self.rsl_time + self.RSL_PERIOD):
                 if self.state == self.RSL_STATE_ENABLED_OFF:
                     self.pixels.fill(self.RSL_ON)
@@ -51,4 +53,3 @@ class RSL:
                     self.state = self.RSL_STATE_ENABLED_OFF
                 self.rsl_time = _now
             self.pixels.show()
-
