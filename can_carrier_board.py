@@ -7,9 +7,14 @@ import digitalio
 
 
 class CANCarrierBoard:
-    def __init__(self, v2=False, dio_pull_ups=False):
+    def __init__(self, v2=False, enable_level_shifter=False,
+                 enable_dio_pull_ups=False):
         """I/Os allocated for use with the Team Appreciate CAN
         Carrier Board."""
+
+        self.is_v2_carrier = v2
+        self.level_shifter_enabled = False
+        self.dio_pull_ups_enabled = False
 
         # make sure running on a Feather M4 CAN
         if board.board_id != "feather_m4_can":
@@ -39,27 +44,34 @@ class CANCarrierBoard:
         self.SCL3 = board.D13
         self.SDA3 = board.D12
 
-        if dio_pull_ups:
+        if enable_dio_pull_ups:
             """Either board, conditionally pre-enable DIO pull ups"""
-            dio0 = digitalio.DigitalInOut(self.DIO0)
-            dio0.pull = digitalio.Pull.UP
-            dio0.direction = digitalio.Direction.INPUT
+            self.enable_dio_pullups()
 
-            dio1 = digitalio.DigitalInOut(self.DIO1)
-            dio1.pull = digitalio.Pull.UP
-            dio1.direction = digitalio.Direction.INPUT
-
-            dio2 = digitalio.DigitalInOut(self.DIO2)
-            dio2.pull = digitalio.Pull.UP
-            dio2.direction = digitalio.Direction.INPUT
-
-            dio3 = digitalio.DigitalInOut(self.DIO3)
-            dio3.pull = digitalio.Pull.UP
-            dio3.direction = digitalio.Direction.INPUT
-
-        if v2:
+        if self.is_v2_carrier:
             """V2 board, the A5 pin is used for the OE of the level shifter"""
             self.LS_OE = board.A5
-            ls_oe = digitalio.DigitalInOut(self.LS_OE)
-            ls_oe.direction = digitalio.Direction.OUTPUT
-            ls_oe.value = True
+            self.ls_oe_pin = digitalio.DigitalInOut(self.LS_OE)
+            self.ls_oe_pin.direction = digitalio.Direction.OUTPUT
+
+    def enable_level_shifter(self):
+        if self.is_v2_carrier:
+            self.ls_oe_pin.value = True
+            self.level_shifter_enabled = True
+
+    def disable_level_shifter(self):
+        if self.is_v2_carrier:
+            self.ls_oe_pin.value = False
+            self.level_shifter_enabled = False
+
+    def enable_dio_pullup(self, pin):
+        digitalio.DigitalInOut(pin).pull = digitalio.Pull.UP
+
+    def enable_all_dio_pullups(self):
+        self.enable_dio_pullup(self.DIO0)
+        self.enable_dio_pullup(self.DIO1)
+        self.enable_dio_pullup(self.DIO2)
+        self.enable_dio_pullup(self.DIO3)
+
+    def set_as_input(self, pin):
+        digitalio.DigitalInOut(pin).direction = digitalio.Direction.INPUT
