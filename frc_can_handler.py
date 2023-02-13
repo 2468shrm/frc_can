@@ -7,7 +7,7 @@ import canio
 class CANHandler:
     def __init__(self, rx=board.CAN_RX, tx=board.CAN_TX,
                  matches=[],
-                 baudrate=1000000, timeout=0.01):
+                 baudrate=1000000, timeout=0.5):
         self.timeout = timeout
         self.rx = rx
         self.tx = tx
@@ -92,10 +92,17 @@ class CANHandler:
                 # it is a canio.Message..
                 if message.id in self.handler_table:
                     # And we are setup to process it...
-                    self.handler_table[message.id](message)
+                    return_message = self.handler_table[message.id](message)
+                    if return_message:
+                        self.send(return_message)
             else:
                 # it is a canio.RemoteTransmissionRequest
                 if message.id in self.rtr_handler_table:
                     # And we are setup to process it...
-                    self.rtr_handler_table[message.id](message)
-        self.iteration_function()
+                    return_message = \
+                        self.rtr_handler_table[message.id](message)
+                    if return_message:
+                        self.send(return_message)
+        message = self.iteration_function()
+        if message:
+            self.send(message)

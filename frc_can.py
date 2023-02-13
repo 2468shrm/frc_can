@@ -1,11 +1,5 @@
 
 class FRCCANDevice:
-    def __init__(self, device_type=0, manufacturer=0, api=0, device_number=0):
-        self.device_type = device_type
-        self.manufacturer = manufacturer
-        self.api = api
-        self.device_number = device_number
-
     """These are constants for the MessageID bit field"""
     DEVICE_TYPE_LSB = 24
     DEVICE_TYPE_MASK = 0x1f
@@ -46,21 +40,26 @@ class FRCCANDevice:
     MANUFACTURER_PLAYING_WITH_FUSION = 11
     MANUFACTURER_STUDICA = 12
 
+    def __init__(self, device_type=0, manufacturer=0, api=0, device_number=0):
+        self.device_type = device_type
+        self.manufacturer = manufacturer
+        self.api = api
+        self.device_number = device_number
+
+        self.message_id = (self.device_type & self.DEVICE_NUMBER_MASK) << \
+            self.DEVICE_TYPE_LSB | \
+            (self.manufacturer & self.MANUFACTURER_MASK) << \
+            self.MANUFACTURER_LSB | \
+            (self.api & self.API_MASK) << self.API_LSB | \
+            (self.device_number & self.DEVICE_NUMBER_MASK) << \
+            self.DEVICE_NUMBER_LSB
+
     def __str__(self) -> str:
         _s = f"device_type: {self.device_type}"
         _s += f"manufacturer: {self.manufacturer}"
         _s += f"api: {self.api}"
         _s += f"device_number: {self.device_number}"
         return _s
-
-    def __post_init__(self):
-        self.message_id = (self.device_type & self.DEVICE_NUMBER_MASK) << \
-                              self.DEVICE_TYPE_LSB | \
-                          (self.manufacturer & self.MANUFACTURER_MASK) << \
-                              self.MANUFACTURER_LSB | \
-                          (self.api & self.API_MASK) << self.API_LSB | \
-                          (self.device_number & self.DEVICE_NUMBER_MASK) << \
-                              self.DEVICE_NUMBER_LSB
 
     def update(self, msg_id):
         """Updates the instance value with full MessageID value."""
@@ -112,8 +111,7 @@ if __name__ == '__main__':
         raise RuntimeError(f"test1 expected to have value"
                            " 0x{expected_value:08x},"
                            "not 0x{test1.message_id:08x}")
-    print(f"test1.message_id value should be 0x{expected_value:08x}, i"
-          " 0x{test1.message_id:08x}")
+    print("test1.message_id value should be 0x{:08x}, is 0x{:08x}".format(expected_value, test1.message_id))
 
     test2 = FRCCANDevice(device_type=FRCCANDevice.DEVICE_TYPE_MISCELLANEOUS,
                          manufacturer=FRCCANDevice.MANUFACTURER_TEAM_USE,
