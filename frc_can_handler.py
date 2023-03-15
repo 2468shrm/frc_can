@@ -78,7 +78,11 @@ class CANHandler:
         """Setup a function to be called when a CAN message does not
         arrive.  Examples include sampling and processing I/Os for
         indexing, reading sensors over I2C/SPI, etc."""
-        self.iteration_function = iteration_function
+        if isinstance(iteration_function, list):
+            self.iteration_function = iteration_function
+        else:
+            # store as a list, even a single entry list
+            self.iteration_function = [iteration_function]
 
     def step(self):
         """Wait for the arrival of a message or a timeout. The message
@@ -103,6 +107,9 @@ class CANHandler:
                         self.rtr_handler_table[message.id](message)
                     if return_message:
                         self.send(return_message)
-        message = self.iteration_function()
-        if message:
-            self.send(message)
+        # tun all of the registered iteration functions, one at a time
+        # if any generate a message, send it
+        for func in self.iteration_function:
+            message = func()
+            if message:
+                self.send(message)
