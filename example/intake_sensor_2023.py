@@ -1,4 +1,5 @@
 
+import math
 import struct
 import time
 import canio
@@ -58,8 +59,8 @@ class INTAKE_SENSOR_2023:
 
         carrier_board = CANCarrierBoard()
         _carrier_pixel_pin = carrier_board.NEOPIXEL
-        _num_carrier_pixels = 40
-        self.carrier_pixel = neopixel.NeoPixel(_carrier_pixel_pin, _num_carrier_pixels, brightness=0.3, auto_write=False)
+        self.num_carrier_pixels = 35
+        self.carrier_pixel = neopixel.NeoPixel(_carrier_pixel_pin, self.num_carrier_pixels, brightness=0.3, auto_write=False)
 
     def filter_enable(self, message):
         self.filter = True
@@ -93,13 +94,22 @@ class INTAKE_SENSOR_2023:
         else:
             _send_message = True
 
-        if _distance >= 50:
+        # LED strip for driver aid
+        _visual_width = 6
+        if _distance >= 39:
+            _color = (255, 255, 0)
+            self.carrier_pixel.fill(_color)
+
+        elif _distance > 36.0 and _distance < 39.0:
             _color = (255, 0, 0)
-        elif _distance > 35.0 and _distance < 50.0:
-            _color = (255, 0, 255)
+            self.carrier_pixel.fill(_color)
         else:
             _color = (0, 255, 0)
-        self.carrier_pixel.fill(_color)
+            _start = max(_distance - 3, 0)
+            _end = min(_distance + 3, self.num_carrier_pixels-1)
+            for i in range(len(self.carrier_pixel)):
+                _pcolor = (0, 0, 0) if (i < _start or i > _end) else _color
+                self.carrier_pixel[i] = _pcolor
         self.carrier_pixel.show()
 
         if _send_message:
