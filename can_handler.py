@@ -1,52 +1,63 @@
 
 import board
 import digitalio
-import canio
+import busio
+from canio import Message, Match
 
+"""
+Eventually, put this in the CarrierBoard for PicoW
+if "raspberry_pi_pico" in board.board_id:
+    # either Pico or Pico W
+    from adafruit_mcp2515.canio import Message, RemoteTransmissionRequest
+    from adafruit_mcp2515 import MCP2515 as CAN
+else:
+    from canio import Message, RemoteTransmissionRequest
+    from canio import CAN
+"""
 
 class CANHandler:
-    def __init__(self, rx=board.CAN_RX, tx=board.CAN_TX,
-                 matches=[],
-                 baudrate=1000000, timeout=0.5):
+    def __init__(self, carrier_board, timeout=0.1):
+        """
+            CANHandler provides a convenient framework for building robotics
+            applications using Adafruit and Raspberry Pi boards.  They're even
+            more useful if the boards are plugged into the Carrier Boards
+            we designed for FRC.
+
+            In particular the Adafruit Feather M4 CAN Express (4759) or the
+            Raspberry Pi Pico W combined with an Adafruit Picowbell CAN Bus
+            (5728).  It may work with an Adafruit RP2040 CAN Bus Feather
+            (5724), but it hasn't been tested.
+        """
+        # The carrier board passed to the handler for sending messages
+        self.cb = carrier_board
+
+        # timeout
         self.timeout = timeout
-        self.rx = rx
-        self.tx = tx
-        self.baudrate = baudrate
-        self.matches = matches
+
+        # Functions run each iteration step
         self.iteration_function = None
-        # A table for mapping canio.Messages to a handler function
+
+        # an optional timeout function that can be run, but only if
+        # set and a message is not received in timeout period
+        self.timeout_function = None
+
+        # A table for mapping Messages to a handler function
         self.handler_table = {}
-        # A table for mapping canio.RemoteTransmissionRequest to a
+
+        # A table for mapping RemoteTransmissionRequest to a
         # handler function
         self.rtr_handler_table = {}
 
-        self.can = canio.CAN(rx=self.rx, tx=self.tx, baudrate=self.baudrate)
-        self.listener = self.can.listen(matches=self.matches,
-                                        timeout=self.timeout)
-
-        # If the CAN transceiver has a standby pin, bring it out of
-        # standby mode
-        if hasattr(board, 'CAN_STANDBY'):
-            self.standby = digitalio.DigitalInOut(board.CAN_STANDBY)
-            self.standby.switch_to_output(False)
-
-        # If the CAN transceiver is powered by a boost converter, turn
-        # on its supply. For example, the Adafruit M4 CAN Feather Express
-        # has a 3.3V to 5V boost converter that powers the CAN transceiver.
-        if hasattr(board, 'BOOST_ENABLE'):
-            self.boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
-            self.boost_enable.switch_to_output(True)
-
     def send(self, msg):
         """Sends a message. Typically used for status transmissions."""
-        self.can.send(msg)
+        self.cb.can.send(msg)
 
     def register_handler(self, message_id, function):
         """Adds a function (handler) to process a message. These are added
         to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
         if message_id in self.handler_table:
-            print(f"ERROR: Attempting to add MessageID that was"
+            print("ERROR: Attempting to add MessageID that was"
                   " pre-registered")
             return
         self.handler_table[message_id] = function
@@ -56,28 +67,31 @@ class CANHandler:
         to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
         if message_id in self.rtr_handler_table:
-            print(f"ERROR: Attempting to add MessageID that was "
+            print("ERROR: Attempting to add MessageID that was "
                   "pre-registered")
             return
         self.rtr_handler_table[message_id] = function
 
+    def register_timeout_handler(self, function):
+        self.timeout_function = function
+
     """Example handler for RemoteTransmissionRequest handling.
     def example_rtr_handler(message):
         reply_data = struct.pack(format, source_of_data)
-        reply_message = canio.Message(id=message.id,
+        reply_message = Message(id=message.id,
                                       data=reply_data,
                                       extended=message.extended)
-        can_handler.send(reply_message)
+        retirm reply_message
     """
 
     def set_timeout(self, timeout):
-        """Be able to change the timeout following constructor."""
+        """Be able to change the timeout following the constructor."""
         self.timeout = timeout
 
     def register_iteration(self, iteration_function):
         """Setup a function to be called when a CAN message does not
-        arrive.  Examples include sampling and processing I/Os for
-        indexing, reading sensors over I2C/SPI, etc."""
+        arrive. Examples include sampling and processing I/Os for
+        indexing, reading sensors over I2C, SPI, etc."""
         if isinstance(iteration_function, list):
             self.iteration_function = iteration_function
         else:
@@ -86,28 +100,31 @@ class CANHandler:
 
     def step(self):
         """Wait for the arrival of a message or a timeout. The message
-        can be a Message or a RemoteTransmissionRequest.  If one arrives,
+        can be a Message or a RemoteTransmissionRequest. If one arrives,
         process it. Whether a message/RTR arrives or not, call the
         "iteration" function make progress on processing things needed."""
         message = self.listener.receive()
         if message:
             # A CAN message was received...
-            if isinstance(message, canio.Message):
-                # it is a canio.Message..
+            if isinstance(message, Message):
+                # it is a Message..
                 if message.id in self.handler_table:
                     # And we are setup to process it...
                     return_message = self.handler_table[message.id](message)
                     if return_message:
                         self.send(return_message)
             else:
-                # it is a canio.RemoteTransmissionRequest
+                # it is a RemoteTransmissionRequest
                 if message.id in self.rtr_handler_table:
                     # And we are setup to process it...
                     return_message = \
                         self.rtr_handler_table[message.id](message)
                     if return_message:
                         self.send(return_message)
-        # tun all of the registered iteration functions, one at a time
+        elif message is None and self.timeout_function:
+            self.timeout_function()
+
+        # run all of the registered iteration functions, one at a time
         # if any generate a message, send it
         for func in self.iteration_function:
             message = func()
