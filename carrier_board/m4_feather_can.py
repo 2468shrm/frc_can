@@ -31,7 +31,7 @@ class CarrierBoard:
     STATUS_NEO = board.NEOPIXEL
 
     # Neopixel interface
-    NEOPIXEL = board.D4
+    NEOPIXEL_IF = board.D4
 
     # Digital inputs
     DIO0 = board.D6
@@ -163,11 +163,11 @@ class CarrierBoard:
         if "init_neopixel" in configuration and configuration["init_neopixel"]:
             _num_pixels_on_board = "num_pixels" in configuration["init_neopixel"] if \
                 configuration["init_neopixel"]["num_pixels"] else 1
-            self.NEOPIXEL_IF = neopixel.NeoPixel(self.NEOPIXEL,
+            self.neopixel = neopixel.NeoPixel(self.NEOPIXEL_IF,
                                                  _num_pixels_on_board,
                                                  brightness=0.3, auto_write=False)
-            self.NEOPIXEL_IF.fill(self.BLACK_COLOR)
-            self.NEOPIXEL_IF.show()
+            self.neopixel.fill(self.BLACK_COLOR)
+            self.neopixel.show()
 
         self.neopixel_status.fill(self.BOOT_READY_COLOR)
         self.neopixel_status.show()
