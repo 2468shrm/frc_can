@@ -16,7 +16,7 @@ else:
 """
 
 class CANHandler:
-    def __init__(self, carrier_board, timeout=0.1):
+    def __init__(self, carrier_board, drain_queue=False, timeout=0.1):
         """
             CANHandler provides a convenient framework for building robotics
             applications using Adafruit and Raspberry Pi boards.  They're even
@@ -30,6 +30,9 @@ class CANHandler:
         """
         # The carrier board passed to the handler for sending messages
         self.cb = carrier_board
+
+        # Process all received messages during timeout slot
+        self.drain_queue = drain_queue
 
         # timeout
         self.timeout = timeout
@@ -73,6 +76,9 @@ class CANHandler:
         self.rtr_handler_table[message_id] = function
 
     def register_timeout_handler(self, function):
+        """Adds a function (handler) to call in the event that a CAN
+        message was not receive during the timeout period. The idea is to
+        use this to detect a missing heartbeat message."""
         self.timeout_function = function
 
     """Example handler for RemoteTransmissionRequest handling.
