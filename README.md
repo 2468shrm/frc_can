@@ -2,21 +2,27 @@
 
 ## What is frc_can?
 
-A simple circuitpython-based wrapper around the canio module for connecting
-CAN-connected sensors to FRC robots. It is intended to simplify the creation of
-FRC sensor and other applications. It runs on Adafruit feather boards running
-circuitpython, specifically the M4 CAN Express Feather board.
+A simple circuitpython-based module for creating CAN-based FRC applications.
+It is built around the canio module and useful for connecting smart sensors
+connected to single-board computers allowing us to make CAN-connected sensors
+for FRC robots. It is intended to simplify the creation of FRC sensor and
+other applications. It runs on Adafruit feather boards running circuitpython,
+specifically the M4 CAN Express Feather board.
 
 NOTE: This code is experimental. Use at own risk.
 
 ## How does it help?
 
-There are three objects provided: *FRCCANDevice* (in frc_can.py), *CANHandler* (in frc_can_handler.py), and *CANCarrierBoard* (in can_carrier_board.py). 
+There are multiple objects provided:
+  - *FRCCANDevice* (in ids/msg_format.py)
+  - *HeartBeatMsg* (in ids/heartbeat.py)
+  - *CANHandler* (in can_handler.py)
+  - *CANCarrierBoard* (in carrier_board/*board*.py, where board=m4_feather_can,
+  raspberrypi_pico_w, etc.). 
 
 ## FRCCANDevice
-FRCCANDevice provides basic FRC CAN protocol assistance, specifically MessageID
-field construction and field value enumeration (defined values to fields).
-FRCCANDevice is used by CANHandler.
+FRCCANDevice provides basic FRC CAN message object formatting assistance. FRC has a
+defined MessageID field partition and field values.
 
 ## CANHandler
 CANHandler assists in creating applications by providing a framework to associate
@@ -24,30 +30,59 @@ received messages (Message or RemoteTransmissionRequest) to functions. CANHander
 also provides a means to call a data function after processing a message or
 following a listener timeout.
 
-## CANCarrierBoard
-Supplements the board attributes of the circuitpython builtins on their boards
-and defines mappings when using an
+## CarrierBoard
+Supplements the board attributes found in the circuitpython builtins on the
+Adafruit boards and defines mappings when using an
 [Adafruit Feather M4 CAN Express](https://www.adafruit.com/product/4759)
 board with a
 [2468 CAN Carrier Board](https://github.com/2468shrm/M4_CAN_Feather_Carrier_v2).
+or a [Raspberry Pi Pico W](https://www.adafruit.com/product/5526) board with its
+carrier board (link to come).
 
 # APIs Of Each Class
 
 ## FRCCANDevice
+### Importing
+`from ids.msg_format import FRCCANDevice`
 
 ### Constructor
-`FRCCANDevice(int: device_type = 0, int: manufacturer = 0, int: api = 0, int: device_number = 0)`
-### update
-`FRCCANDevice.update(int: msg_id)`
-### update_device_type
-`FRCCANDevice.update_device_type(int: device_type)`
-### update_manufacturer
-`FRCCANDevice.update_manufacturer(int: manufacturer)`
-### update_api
-`FRCCANDevice.update_api(int: api)`
-### update_device_number
-`FRCCANDevice.update_device_number(int: device_number)`
+`FRCCANDevice(int: device_type=None, int: manufacturer=None, int: api=None, int: device_number=None, message_id=None)`
 
+Plus getter and setter functions for device_type, manufacturer, api, device_id, 
+and message_id.  A __str__ function is provided for debugging.
+
+## HearBeatMsg
+THe HeartBeatMsg class is used for creating, inserting, extracting,
+and inspecting the fields and content of the CAN message payload for
+a heart beat message.
+
+### Importing
+`from ids.heartbeat import HeartBeatMsg`
+### Constructor
+`HeartBeatMsg(int: data=None)`
+
+Use data=value to initialize a known heart beat message for debugging.
+Otherwise, there is getter/setter functions for each field in the
+heart beat message payload. This includes:
+- data (gets/sets the whole payload data (an bytearray of length 8 bytes))
+- match_time
+- match_number
+- replay_number
+- red_alliance
+- enabled
+- autonomous
+- test_mode
+- system_watchdog
+- tournament_type
+- time_of_day_yr
+- time_of_day_month
+- time_of_day_day
+- time_of_day_sec
+- time_of_day_min
+- time_of_day_hr
+
+There is also a convenient function id() which returns the message id of
+a heart beat message.
 
 ## CANHandler
 
@@ -67,8 +102,7 @@ int: baudrate, float: timeout)`
 ### step
 `CANHandler.step()`
 
-
-## CANCarrierBoard
+## CarrierBoard
 
 ### Pin Mappings
 Example mappings you get from the CANCarrierBoard class:
@@ -84,26 +118,65 @@ CANCarrierBoard.SDA0      (board attribute for pin STEMMA QT/Qwiic interface 0 d
 Instantiating a CANCarrierBoard object also (optionally) initializes one of two
 board-level features.
  
-`CANCarrierBoard(v2: Optional[bool] = False, dio_pull_ups: Optional[bool] = False)`
+`CANCarrierBoard(configuration)`
 
-- If the v2 parameter is set to True, this drives the output enable signal for the
-level shifter so the level shifter becomes active.
+Configuration is a dict() that contains a number of defined key/values
+specific to the target carrier board.
 
-- If the dio_pull_ups parameter is set to True, the feather board's I/O connected to
-the carrier board's DIOs have their internal pull ups enabled.
+#### m4_feather_can configuration dict definition
+The key values and values include:
+- include_can : False | CAN configuration dict() which includes
+  - loopback : True | False
+  - silent : True | False
+  - baudrate : 125_000 | 250_000 | 500_000 | 1_000_999
+  - auto_restart : True | False
+- incldue_eth : False | Ethernet configuration dict() which includes
+  - is_dhcp : True | False
+  - mac : "xx:yy:zz:aa:bb:cc"
+  - hostname : str
+  - debug : True | False
+- include_microsd : True | False
+- init_i2c0 : True | False
+- init_i2c1 : True | False
+- init_i2c2 : True | False
+- init_neopixel : False | neopixel configuration dict() which includes
+  - num_pixels : int
 
-### enable_level_shifter
-`CANCarrierBoard.enable_level_shifter()`
-### disable_level_shifter
-`CANCarrierBoard.disable_level_shifter()`
-### enable_dio_pullup
-`CANCarrierBoard.enable_dio_pullup(pin: board.pin)`
-### enable_all_dio_pullups
-`CANCarrierBoard.enable_all_dio_pullups()`
+An example:
+```
+# Enable CAN for FRC setup and enable the Neopixel interface with a
+# single pixel, but nothing else.
+#
+CarrierBoardConfiguration = {
+    "include_can":
+    {
+        "baudrate": 1000000,
+        "auto_restart": True
+    },
+    "include_eth": False,
+    "include_microsd": False,
+    "init_i2c0": False,
+    "init_i2c1": False,
+    "init_i2c2": False,
+    "init_neopixel":
+    {
+        "num_pixels": 1
+    }
+}
+
+# Initialize the carrier board
+cb = CarrierBoard(CarrierBoardConfiguration)
+```
+
 ### set_as_input
 `CANCarrierBoard.set_as_input(pin: board.pin)`
 
 # Creating An Embedded Application Using CANHandler
+
+*OUTDATED.. NEEDS UPDATE*
+
+
+
 Application creation becomes formulaic.
 
 - A list of message IDs/remote transmit request IDs is defined as the CAN API
