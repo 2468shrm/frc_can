@@ -11,22 +11,6 @@ from ids.msg_format import FRCCANDevice
 from ids.heartbeat import HeartBeatMsg
 from adafruit_ticks import ticks_ms, ticks_less, ticks_add
 
-CarrierBoardConfiguration = {
-    "include_can":
-    {
-        "baudrate": 1000000,
-        "auto_restart": True
-    },
-    "include_eth": False,
-    "include_microsd": False,
-    "init_i2c0": False,
-    "init_i2c1": False,
-    "init_i2c2": False,
-    "init_neopixel":
-    {
-        "num_pixels": 1
-    }
-}
 
 class RobotSignalLight:
     # Colors use by an RSL are...
@@ -55,7 +39,7 @@ class RobotSignalLight:
     # disable
     TIMEOUT_PERIOD = 100   # 0.1s
 
-    def __init__(self, carrier_board):
+    def __init__(self, carrier_board: dict) -> None:
         """Simulates a Robot Signal Light (RSL) function by listening to the
         CAN heart beat message. In the heart beat, if the system_watchdog but
         is set, the robot is enabled and the RSL should flash about 4-5 Hz.
@@ -79,7 +63,7 @@ class RobotSignalLight:
         self.blink_time = ticks_add(_now, self.BLINK_PERIOD_HALF)
         self.timeout_time = ticks_add(_now, self.TIMEOUT_PERIOD) 
 
-    def not_a_heartbeat_msg(self):
+    def not_a_heartbeat_msg(self) -> None:
         """not_a_heartbeat_msg function is called for any message received by
         CANHandler that isn't a heartbeat. This option of CANHandler is used only
         to look for expired periods without seeing a heart beat message."""
@@ -89,7 +73,7 @@ class RobotSignalLight:
             self.state = self.ERROR
             self.cb.neopixel.show()
 
-    def heartbeat_msg(self, message):
+    def heartbeat_msg(self, message: HeartBeatMsg) -> None:
         """The heartbeat_msg() function should be called ONLY if a heartbeat message
         was received by CANHandler (we specifically register a message handler
         for this message ID)# """
@@ -120,7 +104,7 @@ class RobotSignalLight:
         # reset the timeout time since we've seen a heart beat..
         self.timeout_time = ticks_add(_now, self.TIMEOUT_PERIOD) 
 
-    def timeout(self, message):
+    def timeout(self, message) -> None:
         # The timeout() function should be called ONLY if no message is received
         # during the listen period, which means the heartbeat is not being sent
         cb.neopixel.fill(self.RED)
@@ -131,6 +115,25 @@ class RobotSignalLight:
         self.blink_time = ticks_add(_now, self.BLINK_PERIOD_HALF)
         self.timeout_time = ticks_add(_now, self.TIMEOUT_PERIOD) 
 
+
+# How much do we initialize the carrier board?  Just the CAN interface and
+# Neopixel interface
+CarrierBoardConfiguration = {
+    "include_can":
+    {
+        "baudrate": 1000000,
+        "auto_restart": True
+    },
+    "include_eth": False,
+    "include_microsd": False,
+    "init_i2c0": False,
+    "init_i2c1": False,
+    "init_i2c2": False,
+    "init_neopixel":
+    {
+        "num_pixels": 1
+    }
+}
 
 # Initialize the carrier board
 cb = CarrierBoard(CarrierBoardConfiguration)
@@ -143,6 +146,7 @@ hb = HeartBeatMsg()
 
 # Create a handler instance, marking it to handle all outstanding (queued )
 handler = CANHandler(carrier_board=cb, drain_queue=True, timeout=0.1)
+
 # One for decoded heart beats, one for non-decoded heart beats, and
 # one for timeouts.
 handler.register_handler(hb.id, rsl.heartbeat_msg)

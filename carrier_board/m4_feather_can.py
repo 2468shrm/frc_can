@@ -72,7 +72,7 @@ class CarrierBoard:
     BOOT_READY_COLOR = (0,255,0)  # Green
     BLACK_COLOR = (0,0,0)         # Black
 
-    def __init__(self, configuration):
+    def __init__(self, configuration: dict) -> CarrierBoard:
         # make sure running on a Feather M4 CAN, if not complain
         if board.board_id != "feather_m4_can":
             raise RuntimeError("expected to be running on a Feather"
