@@ -7,18 +7,21 @@ import busio
 import digitalio
 
 # For use with the M4 Feather CAN Express's built-in CAN..
-from canio import Message, RemoteTransmissionRequest
-from canio import CAN, BusState
+from canio import CAN
+# from canio import BusState, Message, RemoteTransmissionRequest
 
-# For optional use with the Ethernet FeatherWing board
-#import adafruit_connection_manager
-#import adafruit_requests
-#from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-#import neopixel
+# For use with the Ethernet FeatherWing socket..
+# import adafruit_connection_manager
+# import adafruit_requests
+from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 
-# For optional use with a microSD card
-#import sdcardio
-#import storage
+# For use with the MicroSD card socket..
+import sdcardio
+# import storage
+
+# For use with the NeoPixel interface..
+import neopixel
+
 
 class CarrierBoard:
     """CAN Carrier Board for Adafruit Feather M4 CAN Express board
@@ -72,14 +75,13 @@ class CarrierBoard:
     BOOT_READY_COLOR = (0,255,0)  # Green
     BLACK_COLOR = (0,0,0)         # Black
 
-    def __init__(self, configuration: dict) -> CarrierBoard:
+    def __init__(self, configuration: dict) -> None:
         # make sure running on a Feather M4 CAN, if not complain
         if board.board_id != "feather_m4_can":
             raise RuntimeError("expected to be running on a Feather"
                                "M4 CAN board")
 
         # Configure the neopixel status interface on the Feather board
-        import neopixel
         _num_pixels_on_board = 1
         self.neopixel_status = neopixel.NeoPixel(self.STATUS_NEO,
                                                  _num_pixels_on_board,
