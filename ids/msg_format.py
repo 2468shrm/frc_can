@@ -1,6 +1,9 @@
 
 from micropython import const
 
+__version__ = "0.0.0-auto.0"
+__repo__ = "https://github.com/2468shrm/frc_can.git"
+
 
 class FRCCANDevice:
     """These are constants for the MessageID bit field"""

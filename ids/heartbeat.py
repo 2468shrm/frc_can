@@ -2,6 +2,9 @@
 # Information for this file derived from
 # https://docs.wpilib.org/en/stable/docs/software/can-devices/can-addressing.html
 
+__version__ = "0.0.0-auto.0"
+__repo__ = "https://github.com/2468shrm/frc_can.git"
+
 
 class HeartBeatMsg:
     # The ID of the heart beat system message (from the HTML link above)
@@ -18,7 +21,7 @@ class HeartBeatMsg:
     # Time of day, minute
     # It ocupies 3 bits of byte 0 (bits 2:0)
     #  and 3 bits of byte 1 (bits 7:5)
-    # [0]: -----HHH 
+    # [0]: -----HHH
     # [1]: LLL-----
     # uint64_t timeOfDay_min : 6;
     TIME_OF_DAY_MIN_BYTE_H = 0
@@ -468,7 +471,8 @@ class HeartBeatMsg:
 
     @property
     def time_of_day_hr(self) -> int:
-        """Gets the hour field of the time of day of the heartbeat message object."""
+        """Gets the hour field of the time of day of the heartbeat
+        message object."""
         return self._extract_single(
             self.TIME_OF_DAY_HR_BYTE,
             self.TIME_OF_DAY_HR_LSB,
@@ -477,7 +481,8 @@ class HeartBeatMsg:
 
     @time_of_day_hr.setter
     def time_of_day_hr(self, value: int) -> None:
-        """Sets the hour field of the time of day of the heartbeat message object."""
+        """Sets the hour field of the time of day of the heartbeat
+        message object."""
         self._insert_single(
             value,
             self.TIME_OF_DAY_HR_BYTE,
@@ -487,22 +492,23 @@ class HeartBeatMsg:
 
     def __str__(self) -> str:
         """String representation of the object's data value."""
-        _s = ("Heartbeat data:\n"
-              f" time/date: {self.time_of_day_hr}:"
-              f"{self.time_of_day_min}:"
-              f"{self.time_of_day_sec} "
-              f"{self.time_of_day_day}/"
-              f"{self.time_of_day_month}/"
-              f"{self.time_of_day_year}\n"
-              f" tournament_type: {self.tournament_type}\n"
-              f" system_watchdog: {self.system_watchdog}\n"
-              f" test_mode: {self.test_mode}\n"
-              f" autonomous: {self.autonomous}\n"
-              f" enabled: {self.enabled}\n"
-              f" red_alliance {self.red_alliance}\n"
-              f" replay_number: {self.replay_number}\n"
-              f" match number: {self.match_number}\n"
-              f" match time: {self.match_time} s"
+        _s = (
+            "Heartbeat data:\n"
+            f" time/date: {self.time_of_day_hr}:"
+            f"{self.time_of_day_min}:"
+            f"{self.time_of_day_sec} "
+            f"{self.time_of_day_day}/"
+            f"{self.time_of_day_month}/"
+            f"{self.time_of_day_year}\n"
+            f" tournament_type: {self.tournament_type}\n"
+            f" system_watchdog: {self.system_watchdog}\n"
+            f" test_mode: {self.test_mode}\n"
+            f" autonomous: {self.autonomous}\n"
+            f" enabled: {self.enabled}\n"
+            f" red_alliance {self.red_alliance}\n"
+            f" replay_number: {self.replay_number}\n"
+            f" match number: {self.match_number}\n"
+            f" match time: {self.match_time} s"
         )
         _s2 = "\n"
         for b in range(8):
