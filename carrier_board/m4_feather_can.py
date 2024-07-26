@@ -115,42 +115,42 @@ class CarrierBoard:
         self.level_shifter_enabled = False
 
         # configure CAN interface, it self.config enables it..
-        if "include_can" in self.config and self.config["include_can"]:
+        if "init_can" in self.config and self.config["init_can"]:
             # Before creating the canio.CAN interace, check for optional
             # features
             _loopback = (
-                self.config["include_can"]["loopback"]
-                if "loopback" in self.config["include_can"]
+                self.config["init_can"]["loopback"]
+                if "loopback" in self.config["init_can"]
                 else False
             )
 
             _silent = (
-                self.config["include_can"]["silent"]
-                if "silent" in self.config["include_can"]
+                self.config["init_can"]["silent"]
+                if "silent" in self.config["init_can"]
                 else False
             )
 
             _baudrate = (
-                self.config["include_can"]["baudrate"]
-                if "baudrate" in self.config["include_can"]
+                self.config["init_can"]["baudrate"]
+                if "baudrate" in self.config["init_can"]
                 else 1000000
             )
 
             _auto_restart = (
-                self.config["include_can"]["auto_restart"]
-                if "auto_restart" in self.config["include_can"]
+                self.config["init_can"]["auto_restart"]
+                if "auto_restart" in self.config["init_can"]
                 else True
             )
 
             _listener_match_list = (
-                self.config["include_can"]["listener_match_list"]
-                if "listener_match_list" in self.config["include_can"]
+                self.config["init_can"]["listener_match_list"]
+                if "listener_match_list" in self.config["init_can"]
                 else None
             )
 
             _timeout = (
-                self.config["include_can"]["timeout"]
-                if "timeout" in self.config["include_can"]
+                self.config["init_can"]["timeout"]
+                if "timeout" in self.config["init_can"]
                 else 0.1
             )
 
@@ -192,30 +192,30 @@ class CarrierBoard:
 
         # Configure Ethernet interface on the Ethernet Featherwing, if
         # self.config enables it
-        if "include_eth" in self.config and self.config["include_eth"]:
+        if "init_eth" in self.config and self.config["init_eth"]:
             # The SPI interface is across fixed pins on the board
             _cs = digitalio.DigitalInOut(self._ETHSPI_CS)
             _spi_bus = busio.SPI(self._SCK, MOSI=self._MOSI, MISO=self._MISO)
 
             # Before creating the WIZNET interace, check for optional features
             self._is_dhcp = (
-                self.config["include_eth"]["is_dhcp"]
-                if "is_dhcp" in self.config["include_eth"]
+                self.config["init_eth"]["is_dhcp"]
+                if "is_dhcp" in self.config["init_eth"]
                 else False
             )
             self._mac = (
-                self.config["include_eth"]["mac"]
-                if "mac" in self.config["include_eth"]
+                self.config["init_eth"]["mac"]
+                if "mac" in self.config["init_eth"]
                 else "DE:AD:BE:EF:FE:ED"
             )
             self._hostname = (
-                self.config["include_eth"]["hostname"]
-                if "hostname" in self.config["include_eth"]
+                self.config["init_eth"]["hostname"]
+                if "hostname" in self.config["init_eth"]
                 else None
             )
             self._debug = (
-                self.config["include_eth"]["debug"]
-                if "debug" in self.config["include_eth"]
+                self.config["init_eth"]["debug"]
+                if "debug" in self.config["init_eth"]
                 else False
             )
 
@@ -229,12 +229,12 @@ class CarrierBoard:
                 debug=self._debug,
             )
 
-        if "include_microsd" in self.config and \
-                self.config["include_microsd"]:
+        if "init_microsd" in self.config and \
+                self.config["init_microsd"]:
 
             _mount_volumne_name = (
-                self.config["include_microsd"]["mount_as"]
-                if "mount_as" in self.config["include_microsd"]
+                self.config["init_microsd"]["mount_as"]
+                if "mount_as" in self.config["init_microsd"]
                 else "/sd"
             )
 
@@ -350,8 +350,8 @@ class CarrierBoard:
         # enables it
         if "init_neopixel" in self.config and self.config["init_neopixel"]:
             _num_pixels_on_board = (
-                "num_pixels" in self.config["init_neopixel"]
-                if self.config["init_neopixel"]["num_pixels"]
+                self.config["init_neopixel"]["num_pixels"]
+                if "num_pixels" in self.config["init_neopixel"]
                 else 1
             )
             self.neopixel = neopixel.NeoPixel(
@@ -368,3 +368,31 @@ class CarrierBoard:
     def enable_level_shifter(self) -> None:
         self.ls_oe_pin.value = True
         self.level_shifter_enabled = True
+
+        # Initalize the DIOs
+        self.DIO0 = self.init_dio("init_dio0", self.DIO0)
+        self.dio1 = self.init_dio("init_dio1", self.DIO1)
+        self.dio2 = self.init_dio("init_dio2", self.DIO2)
+        self.dio3 = self.init_dio("init_dio3", self.DIO3)
+
+    def init_dio(self, keyname, pin):
+        if keyname in self.config and self.config[keyname]:
+            _direction = (
+                digitalio.Direction.INPUT
+                if ("as_input" in self.config[keyname] and
+                    self.config[keyname]["as_input"])
+                else digitalio.Direction.OUTPUT
+            )
+            _value = (
+                self.config[keyname]["value"]
+                if "value" in self.config[keyname]
+                else None
+            )
+            _pin = digitalio.DigitalInOut(pin)
+            _pin.direction = _direction
+            if _value:
+                _pin.value = _value
+            self._enable_dio_level_shifters = True
+        else:
+            _pin = None
+        return _pin

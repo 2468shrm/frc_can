@@ -490,8 +490,8 @@ class CarrierBoard:
         # enables it
         if "init_neopixel" in self.config and self.config["init_neopixel"]:
             _num_pixels_on_board = (
-                "num_pixels" in self.config["init_neopixel"]
-                if self.config["init_neopixel"]["num_pixels"]
+                self.config["init_neopixel"]["num_pixels"]
+                if "num_pixels" in self.config["init_neopixel"]
                 else 1
             )
             self.neopixel = neopixel.NeoPixel(
