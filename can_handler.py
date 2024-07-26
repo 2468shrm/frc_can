@@ -2,11 +2,14 @@
 import board
 import digitalio
 import busio
-from canio import Message, Match
+from canio import Message
+
+__version__ = "0.0.0-auto.0"
+__repo__ = "https://github.com/2468shrm/frc_can.git"
 
 
 class CANHandler:
-    def __init__(self, carrier_board, drain_queue=False, timeout=0.1):
+    def __init__(self, carrier_board, drain_queue=False, timeout=0.1) -> None:
         """CANHandler provides a convenient framework for building robotics
         applications using Adafruit and Raspberry Pi boards.  They're even
         more useful if the boards are plugged into the Carrier Boards
@@ -33,7 +36,10 @@ class CANHandler:
         # handler function
         self.rtr_handler_table = {}
 
-        # 
+        # A table for mapping a function that may optionally be called
+        # if there is no matching message received (i.e. receive returns
+        # None). Optional being that if self.unmatched_handler is not
+        # None, it gets called.
         self.unmatched_handler = None
 
         # Functions run each iteration step
@@ -43,11 +49,11 @@ class CANHandler:
         # set and a message is not received in timeout period
         self.timeout_handler = None
 
-    def send(self, msg):
+    def send(self, msg) -> None:
         """Sends a message. Typically used for status transmissions."""
         self.cb.can.send(msg)
 
-    def register_msg_handler(self, message_id, function):
+    def register_msg_handler(self, message_id, function) -> None:
         """Adds a function (handler) to process a specific message. These are
         added to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
@@ -57,7 +63,7 @@ class CANHandler:
             return
         self.handler_table[message_id] = function
 
-    def register_rtr_handler(self, message_id, function):
+    def register_rtr_handler(self, message_id, function) -> None:
         """Adds a function (handler) to process a message. These are added
         to a dict with message_id as key, function reference as value.
         When a message arrives, if a handler is registered, it is called."""
@@ -67,31 +73,22 @@ class CANHandler:
             return
         self.rtr_handler_table[message_id] = function
 
-    def register_unmatched_handler(self, function):
+    def register_unmatched_handler(self, function) -> None:
         """Adds a function (handler) to process if a Message or RTR is received
         that does not match the expected list"""
         self.unmatched_handler = function
 
-    def register_timeout_handler(self, function):
+    def register_timeout_handler(self, function) -> None:
         """Adds a function (handler) to call in the event that a CAN
         message was not receive during the timeout period. The idea is to
         use this to detect a missing heartbeat message."""
         self.timeout_handler = function
 
-    """Example handler for RemoteTransmissionRequest handling.
-    def example_rtr_handler(message):
-        reply_data = struct.pack(format, source_of_data)
-        reply_message = Message(id=message.id,
-                                      data=reply_data,
-                                      extended=message.extended)
-        retirm reply_message
-    """
-
-    def set_timeout(self, timeout):
+    def set_timeout(self, timeout) -> None:
         """Be able to change the timeout following the constructor."""
         self.timeout = timeout
 
-    def register_iteration_handler(self, iteration_function):
+    def register_iteration_handler(self, iteration_function) -> None:
         """Setup a function to be called when a CAN message does not
         arrive. Examples include sampling and processing I/Os for
         indexing, reading sensors over I2C, SPI, etc."""
@@ -101,25 +98,28 @@ class CANHandler:
             # store as a list, even a single entry list
             self.iteration_function = [iteration_function]
 
-    def step(self):
+    def step(self) -> None:
         """Wait for the arrival of a message or a timeout. The message
         can be a Message or a RemoteTransmissionRequest. If one arrives,
         process it. Whether a message/RTR arrives or not, call the
         "iteration" function make progress on processing things needed."""
-        message = self.listener.receive()
+        message = self.cb.listener.receive()
         if message:
-            while self.listener.in_waiting():
+            while self.cb.listener.in_waiting():
                 # A CAN message was received...
                 if isinstance(message, Message):
                     # it is a Message..
                     if message.id in self.handler_table:
                         # And we are setup to process it...
-                        return_message = self.handler_table[message.id](message)
+                        return_message = (
+                            self.handler_table[message.id](message)
+                        )
                         if return_message:
                             self.send(return_message)
-                    # if there is a handler registered for non-matching msg, call it
+                    # if there is a handler registered for non-matching
+                    # msg, call it
                     elif self.unmatched_handler:
-                        self.unmatched_handler() 
+                        self.unmatched_handler()
                 else:
                     # it is a RemoteTransmissionRequest
                     if message.id in self.rtr_handler_table:
@@ -128,15 +128,17 @@ class CANHandler:
                             self.rtr_handler_table[message.id](message)
                         if return_message:
                             self.send(return_message)
-                    # if there is a handler registered for non-matching msg, call it
+                    # if there is a handler registered for non-matching msg,
+                    # call it
                     elif self.unmatched_handler:
                         self.unmatched_handler()
-                # Leave loop after one iteration if drain_queue is false OR there 
-                # is no more messages in the queue.  Otherwise, continue draining..
-                if self.drain_queue is False and self.listener.in_waiting():
+                # Leave loop after one iteration if drain_queue is false OR
+                # there is no more messages in the queue.  Otherwise,
+                # continue draining..
+                if self.drain_queue is False and self.cb.listener.in_waiting():
                     break
                 # get next message
-                message = self.listener.receive()
+                message = self.cb.listener.receive()
 
         # No message received (ot tiemd out) and a timeout
         elif message is None and self.timout_handler:
