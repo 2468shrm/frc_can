@@ -7,7 +7,6 @@ time knowledge for lacking heartbeats."""
 from carrier_board.m4_feather_can import CarrierBoard
 from canio import Message, Match
 from can_handler import CANHandler
-from ids.msg_format import FRCCANDevice
 from ids.heartbeat import HeartBeatMsg
 from adafruit_ticks import ticks_ms, ticks_less, ticks_add
 
@@ -67,7 +66,8 @@ class RobotSignalLight:
         """not_a_heartbeat_msg function is called for any message received by
         CANHandler that isn't a heartbeat. This option of CANHandler is used only
         to look for expired periods without seeing a heart beat message."""
-        if ticks_less(self.timeout_time, ticks_ms()):
+        _now = ticks_ms()
+        if ticks_less(self.timeout_time, _now):
             self.cb.neopixel.fill(self.RED)
             self.blink = self.ON
             self.state = self.ERROR
@@ -107,9 +107,9 @@ class RobotSignalLight:
     def timeout(self, message) -> None:
         # The timeout() function should be called ONLY if no message is received
         # during the listen period, which means the heartbeat is not being sent
+        self.state = self.ERROR
         cb.neopixel.fill(self.RED)
         self.blink = self.ON
-        self.state = self.ERROR
         cb.neopixel.show()
         _now = ticks_ms()
         self.blink_time = ticks_add(_now, self.BLINK_PERIOD_HALF)
@@ -119,13 +119,14 @@ class RobotSignalLight:
 # How much do we initialize the carrier board?  Just the CAN interface and
 # Neopixel interface
 CarrierBoardConfiguration = {
-    "include_can":
+    "init_can":
     {
         "baudrate": 1000000,
-        "auto_restart": True
+        "auto_restart": True,
+        "listener_match_list": [ canio.Match(HeartBeatMsg.HEARTBEAT_ID, extened=True) ],
     },
-    "include_eth": False,
-    "include_microsd": False,
+    "init_eth": False,
+    "init_microsd": False,
     "init_i2c0": False,
     "init_i2c1": False,
     "init_i2c2": False,
@@ -141,15 +142,12 @@ cb = CarrierBoard(CarrierBoardConfiguration)
 # Create the RSL.. 
 rsl = RobotSignalLight(carrier_board=cb)
 
-# Setup to receive and parse a hearbeat message
-hb = HeartBeatMsg()
-
 # Create a handler instance, marking it to handle all outstanding (queued )
 handler = CANHandler(carrier_board=cb, drain_queue=True, timeout=0.1)
 
 # One for decoded heart beats, one for non-decoded heart beats, and
 # one for timeouts.
-handler.register_handler(hb.id, rsl.heartbeat_msg)
+handler.register_handler(HeartBeatMsg.HEARTBEAT_ID, rsl.heartbeat_msg)
 handler.register_timeout_handler(rsl.timeout)
 handler.register_register_unmatched_handler(rsl.not_a_heartbeat_msg)
 
