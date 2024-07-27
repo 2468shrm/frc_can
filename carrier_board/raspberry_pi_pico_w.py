@@ -469,8 +469,12 @@ class CarrierBoard:
             self._motor_oen.direction = digitalio.Direction.OUTPUT
             self._motor_oen.value = True
 
-            if "enable_pwm_interface" in self.config["include_pwm_generators"] and \
-                     self.config["include_pwm_generators"]["enable_pwm_interface"]:
+            if (
+                "enable_pwm_interface" in self.config["include_pwm_generators"]
+                and self.config["include_pwm_generators"][
+                    "enable_pwm_interface"
+                ]
+            ):
                 self._pwm_oen.value = False
                 print("Enabling PWM generator")
                 self.pwm = ServoKit(
