@@ -47,9 +47,9 @@ class CarrierBoard:
     AI3 = board.A3
 
     # Pin definitions used for the DIO interface.
-    DIO0 = board.D10
+    DIO0 = board.D6
     DIO1 = board.D9
-    DIO2 = board.D6
+    DIO2 = board.D10
     DIO3 = board.D11
 
     # I2C / STEMMA QT / Qwiic connections
