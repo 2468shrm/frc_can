@@ -22,7 +22,8 @@ class INTAKE_DUAL_SENSOR_2023:
     OBJECT_THRESHOLD = 25.0
 
     def __init__(self, i2c0, i2c1, device_number=1,
-                 filter=False, debug=False, do_calibrate=False,
+                 filter=False, debug=False, calibrate_log=False,
+                 do_calibrate=False,
                  real_sensor_distance=0, left_sensor_distance=0,
                  right_sensor_distance=0):
         self.distance_message = FRCCANDevice(
@@ -32,6 +33,7 @@ class INTAKE_DUAL_SENSOR_2023:
             device_number=device_number)
 
         self.debug = debug
+        self.calibrate_log = calibrate_log
         self.filter = filter
         self.do_calibrate = do_calibrate
 
@@ -42,6 +44,8 @@ class INTAKE_DUAL_SENSOR_2023:
                 print("parameter real_sensor_distance must be specified")
             return None
         self.real_sensor_distance = real_sensor_distance
+        self.left_sensor_distance = left_sensor_distance
+        self.right_sensor_distance = right_sensor_distance
 
         if self.debug:
             print("initializing I2C0 interface")
@@ -50,48 +54,33 @@ class INTAKE_DUAL_SENSOR_2023:
 
         # OPTIONAL: can set non-default values
         self.vl53_0.inter_measurement = 0
-        self.vl53_0.timing_budget = 200
+        self.vl53_0.timing_budget = 50  # 200
 
         if self.debug:
-            print("VL53L4CD #0")
-            print("--------------------")
-            model_id, module_type = self.vl53_0.model_info
-            print("Model ID: 0x{:0X}".format(model_id))
-            print("Module Type: 0x{:0X}".format(module_type))
-            print("Timing Budget: {}".format(self.vl53_0.timing_budget))
-            print("Inter-Measurement: {}".format(self.vl53_0.inter_measurement))
-            print("--------------------")
-            print("MessageID {:08x}".format(self.distance_message.message_id))
-            print("--------------------")
+            self.device_info(self.vl53_0)
+        # self.vl53_0.start_ranging()
 
-        self.vl53_0.start_ranging()
-
-        while not self.vl53_0.data_ready:
-            pass
-        self.vl53_0.clear_interrupt()
-        if self.vl53_0.distance > self.OBJECT_THRESHOLD:
-            self.state = self.STATE_OBJECT_NOT_DETECTED
-        else:
-            self.state = self.STATE_OBJECT_DETECTED
+        if False:
+            while not self.vl53_0.data_ready:
+                pass
+            self.vl53_0.clear_interrupt()
+            if self.vl53_0.distance > self.OBJECT_THRESHOLD:
+                self.state = self.STATE_OBJECT_NOT_DETECTED
+            else:
+                self.state = self.STATE_OBJECT_DETECTED
 
         if self.debug:
             print("initializing I2C1 interface")
         self.i2c1 = i2c1
         self.vl53_1 = adafruit_vl53l4cd.VL53L4CD(i2c1)
         self.vl53_1.inter_measurement = 0
-        self.vl53_1.timing_budget = 200
+        self.vl53_1.timing_budget = 50  # 200
 
         if self.debug:
-            print("VL53L4CD #1")
-            print("--------------------")
-            model_id, module_type = self.vl53_1.model_info
-            print("Model ID: 0x{:0X}".format(model_id))
-            print("Module Type: 0x{:0X}".format(module_type))
-            print("Timing Budget: {}".format(self.vl53_1.timing_budget))
-            print("Inter-Measurement: {}".format(self.vl53_1.inter_measurement))
+            self.device_info(self.vl53_1)
+        # self.vl53_1.start_ranging()
 
-        self.vl53_1.start_ranging()
-
+        # create debug/diagnostics interface
         self.led_string = LED_STRING(led_pixels_per_m=60,
                                      sensor=self)
 
@@ -99,21 +88,79 @@ class INTAKE_DUAL_SENSOR_2023:
             self.calibrate()
         else:
             if left_sensor_distance > 0:
-                self.left_distance_max = left_sensor_distance
+                self.left_distance_max = left_sensor_distance - 2.0
             else:
                 self.left_distance_max = real_sensor_distance - 2.0
             if right_sensor_distance > 0:
-                self.right_distance_max = right_sensor_distance
+                self.right_distance_max = right_sensor_distance - 2.0
             else:
                 self.right_distance_max = real_sensor_distance - 2.0
+
+        self.device_info(self.vl53_0)
+        self.device_info(self.vl53_1)            
+        while True:
+            self.test_function()
+
+    # ----
+    def device_info(self, sensor):
+        print("VL53L4CD #0")
+        print("--------------------")
+        model_id, module_type = sensor.model_info
+        print("Model ID: 0x{:0X}".format(model_id))
+        print("Module Type: 0x{:0X}".format(module_type))
+        print("Timing Budget: {}".format(sensor.timing_budget))
+        print("Inter-Measurement: {}".format(sensor.inter_measurement))
+        print("--------------------")
+
+    # ---------------------------------------
+    def test_function(self):
+        _width = 0
+        _center = 0
+
+        self.vl53_0.start_ranging()
+
+        # wait for a reading from both sides
+        while not self.vl53_0.data_ready:
+            pass
+        self.vl53_0.clear_interrupt()
+        self.left_distance = self.vl53_0.distance
+
+        if self.left_distance > self.left_distance_max:
+            pass
+        else:
+            self.vl53_1.start_ranging()
+            while not self.vl53_1.data_ready:
+                pass
+            self.vl53_1.clear_interrupt()
+            # read a second one..
+            while not self.vl53_1.data_ready:
+                pass
+            self.vl53_1.clear_interrupt()
+            self.right_distance = self.vl53_1.distance
+            self.vl53_1.stop_ranging()
+
+            _left_normalized = (self.left_distance / self.left_sensor_distance) * \
+                self.real_sensor_distance
+            _right_normalized = (self.right_distance / self.right_sensor_distance) * \
+                self.real_sensor_distance
+
+            _width = self.real_sensor_distance - \
+                (_left_normalized + _right_normalized)
+            _center = _left_normalized + (_width/2)
+            # print(f"detect real_sensor_distance: {self.real_sensor_distance:.2f}, left_distance: {self.left_distance:.2f}, _left_normalized: {_left_normalized:.2f}, right_distance: {self.right_distance:.2f}, _right_normalized: {_right_normalized:.2f}, _center: {_center:.2f}, _width: {_width:.2f}")
+
+        print(f"({_width:.2f},{_center:.2f})")
 
     # ---------------------------------------
     def calibrate(self):
         if self.debug:
             print("calibrate()")
+
+        self.vl53_0.start_ranging()
+        
         self.led_string.calibrating()
         _samples = 20
-        if self.debug:
+        if self.debug or self.calibrate_log:
             print(" Calibrating VL53L4CD #0")
         sensor_data_0 = CIRCULAR_BUFFER(5)
         for i in range(_samples):
@@ -121,15 +168,20 @@ class INTAKE_DUAL_SENSOR_2023:
                 pass
             self.vl53_0.clear_interrupt()
             _distance = self.vl53_0.distance
-            if self.debug:
+            if self.debug or self.calibrate_log:
                 print(f" +++ {_distance}")
             sensor_data_0.add(_distance)
         _left_distance_avg = sensor_data_0.average()
-        if self.debug:
+        self.left_sensor_distance = _left_distance_avg
+        if self.debug or self.calibrate_log:
             print(f" ..sees width: {_left_distance_avg}")
         self.left_distance_max = _left_distance_avg - 2.0
 
-        if self.debug:
+        self.vl53_0.stop_ranging()
+
+        self.vl53_1.start_ranging()
+
+        if self.debug or self.calibrate_log:
             print(" Calibrating VL53L4CD #1")
         sensor_data_1 = CIRCULAR_BUFFER(5)
         for i in range(_samples):
@@ -137,13 +189,16 @@ class INTAKE_DUAL_SENSOR_2023:
                 pass
             self.vl53_1.clear_interrupt()
             _distance = self.vl53_1.distance
-            if self.debug:
+            if self.debug or self.calibrate_log:
                 print(f" +++ {_distance}")
             sensor_data_1.add(_distance)
         _right_distance_avg = sensor_data_1.average()
-        if self.debug:
+        self.right_sensor_distance = _right_distance_avg
+        if self.debug or self.calibrate_log:
             print(f" ..sees width: {_right_distance_avg}")
         self.right_distance_max = _right_distance_avg - 2.0
+
+        self.vl53_1.stop_ranging()
 
     # ---------------------------------------
     def filter_enable(self, message):
@@ -161,14 +216,15 @@ class INTAKE_DUAL_SENSOR_2023:
     def detect(self):
         if self.debug:
             print("detect")
-        _left_normalized = (self.left_distance / self.left_distance_max) * \
+        _left_normalized = (self.left_distance / self.left_sensor_distance) * \
             self.real_sensor_distance
-        _right_normalized = (self.right_distance / self.right_distance_max) * \
+        _right_normalized = (self.right_distance / self.right_sensor_distance) * \
             self.real_sensor_distance
 
         _width = self.real_sensor_distance - \
             (_left_normalized + _right_normalized)
         _center = _left_normalized + (_width/2)
+        print(f"detect real_sensor_distance: {self.real_sensor_distance:.2f}, left_distance: {self.left_distance:.2f}, _left_normalized: {_left_normalized:.2f}, right_distance: {self.right_distance:.2f}, _right_normalized: {_right_normalized:.2f}, _center: {_center:.2f}, _width: {_width:.2f}")
         if self.debug:
             print(f"center: {_center}, width: {_width}")
         return _center, _width
@@ -220,10 +276,10 @@ class INTAKE_DUAL_SENSOR_2023:
             self.led_string.not_detected()
             return
         else:
-            if self.debug:
-                print("..detected")
             _center, _width = self.detect()
-            self.led_string.detected()
+            #if self.debug:
+            #    print(f"..detected {_center}, {_width}")
+            # self.led_string.detected()
 
         if _send_message:
             msg_body = struct.pack("@ff", _center, _width)
