@@ -97,7 +97,7 @@ class CarrierBoard:
             self.neopixel_status.fill(color)
             self.neopixel_status.show()
 
-    def __init__(self, configuration: dict) -> None:
+    def __init__(self, configuration: dict = {}) -> None:
         # make sure running on a Feather M4 CAN, if not complain
         if board.board_id != "feather_m4_can":
             raise RuntimeError(
@@ -114,222 +114,39 @@ class CarrierBoard:
         self.ls_oe_pin.value = False
         self.level_shifter_enabled = False
 
+        #
+        if "init_microsd" in self.config and self.config["init_microsd"]:
+            self.init_microsd()
+        else:
+            self.microsd = None
+
         # configure CAN interface, it self.config enables it..
         if "init_can" in self.config and self.config["init_can"]:
-            # Before creating the canio.CAN interace, check for optional
-            # features
-            _loopback = (
-                self.config["init_can"]["loopback"]
-                if "loopback" in self.config["init_can"]
-                else False
-            )
-
-            _silent = (
-                self.config["init_can"]["silent"]
-                if "silent" in self.config["init_can"]
-                else False
-            )
-
-            _baudrate = (
-                self.config["init_can"]["baudrate"]
-                if "baudrate" in self.config["init_can"]
-                else 1000000
-            )
-
-            _auto_restart = (
-                self.config["init_can"]["auto_restart"]
-                if "auto_restart" in self.config["init_can"]
-                else True
-            )
-
-            _listener_match_list = (
-                self.config["init_can"]["listener_match_list"]
-                if "listener_match_list" in self.config["init_can"]
-                else None
-            )
-
-            _timeout = (
-                self.config["init_can"]["timeout"]
-                if "timeout" in self.config["init_can"]
-                else 0.1
-            )
-
-            # Before creating the canio.CAN instance, power up the transceiover
-            # If the CAN transceiver has a standby pin, bring it out of standby
-            # mode
-            if hasattr(board, "CAN_STANDBY"):
-                _standby = digitalio.DigitalInOut(board.CAN_STANDBY)
-                _standby.switch_to_output(False)
-
-            # If the CAN transceiver is powered by a boost converter, turn on
-            # its supply
-            if hasattr(board, "BOOST_ENABLE"):
-                _boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
-                _boost_enable.switch_to_output(True)
-
-            # Now, create the canio.CAN instance in the carrier board class
-            self.can = CAN(
-                rx=board.CAN_RX,
-                tx=board.CAN_TX,
-                baudrate=_baudrate,
-                loopback=_loopback,
-                silent=self._silent,
-                auto_restart=self._auto_restart,
-            )
-
-            self.listener = self.can.listener(
-                matches=self._listener_match_list,
-                timeout=_timeout
-            )
+            self.init_can()
+        else:
+            self.can = None
 
         # Create busio instances for I2C0-I2C2
         if "init_i2c0" in self.config and self.config["init_i2c0"]:
-            self.I2C0 = busio.I2C(self.SCL0, self.SDA0)
+            self.i2c0 = busio.I2C(self.SCL0, self.SDA0)
         if "init_i2c1" in self.config and self.config["init_i2c1"]:
-            self.I2C1 = busio.I2C(self.SCL1, self.SDA1)
+            self.i2c1 = busio.I2C(self.SCL1, self.SDA1)
         if "init_i2c2" in self.config and self.config["init_i2c2"]:
-            self.I2C2 = busio.I2C(self.SCL2, self.SDA2)
+            self.i2c2 = busio.I2C(self.SCL2, self.SDA2)
 
         # Configure Ethernet interface on the Ethernet Featherwing, if
         # self.config enables it
         if "init_eth" in self.config and self.config["init_eth"]:
-            # The SPI interface is across fixed pins on the board
-            _cs = digitalio.DigitalInOut(self._ETHSPI_CS)
-            _spi_bus = busio.SPI(self._SCK, MOSI=self._MOSI, MISO=self._MISO)
+            self.init_eth()
+        else:
+            self.eth = None
 
-            # Before creating the WIZNET interace, check for optional features
-            self._is_dhcp = (
-                self.config["init_eth"]["is_dhcp"]
-                if "is_dhcp" in self.config["init_eth"]
-                else False
-            )
-            self._mac = (
-                self.config["init_eth"]["mac"]
-                if "mac" in self.config["init_eth"]
-                else "DE:AD:BE:EF:FE:ED"
-            )
-            self._hostname = (
-                self.config["init_eth"]["hostname"]
-                if "hostname" in self.config["init_eth"]
-                else None
-            )
-            self._debug = (
-                self.config["init_eth"]["debug"]
-                if "debug" in self.config["init_eth"]
-                else False
-            )
-
-            # Now, create the WIZNET instance in the carrier board class
-            self.eth = WIZNET5K(
-                spi_bus=_spi_bus,
-                cs=_cs,
-                is_dhcp=self._is_dhcp,
-                mac=self._mac,
-                hostname=self._hostname,
-                debug=self._debug,
-            )
-
-        if "init_microsd" in self.config and \
-                self.config["init_microsd"]:
-
-            _mount_volumne_name = (
-                self.config["init_microsd"]["mount_as"]
-                if "mount_as" in self.config["init_microsd"]
-                else "/sd"
-            )
-
-            # The microSD uses a SPI interface is across fixed pins on
-            # the board
-            _spi_bus = busio.SPI(self._SCK, MOSI=self._MOSI, MISO=self._MISO)
-
-            # Now, create the sdcardio.SDCard instance in the carrier board
-            # class
-            self.microsd = sdcardio.SDCard(spi=_spi_bus, cs=self._MICRO_SD_CS)
-
-            self.vfs = storage.VfsFat(self.microsd)
-            storage.mount(self.vfs, _mount_volumne_name)
-
-        # initialize the DIO pins?
+        # initialize the DIO pins based on config dict contents
         self._enable_dio_level_shifters = False
-        if "init_dio0" in self.config and self.config["init_dio0"]:
-            _direction = (
-                digitalio.Direction.INPUT
-                if ("as_input" in self.config["init_dio0"] and
-                    self.config["init_dio0"]["as_input"])
-                else digitalio.Direction.OUTPUT
-            )
-            _value = (
-                self.config["init_dio0"]["value"]
-                if "value" in self.config["init_dio0"]
-                else None
-            )
-            self.dio0 = digitalio.DigitalInOut(self.DIO0)
-            self.dio0.direction = _direction
-            if _value:
-                self.dio0.direction = _direction
-            self._enable_dio_level_shifters = True
-        else:
-            self.dio0 = None
-
-        if "init_dio1" in self.config and self.config["init_dio1"]:
-            _direction = (
-                digitalio.Direction.INPUT
-                if ("as_input" in self.config["init_dio1"] and
-                    self.config["init_dio1"]["as_input"])
-                else digitalio.Direction.OUTPUT
-            )
-            _value = (
-                self.config["init_dio1"]["value"]
-                if "value" in self.config["init_dio1"]
-                else None
-            )
-            self.dio1 = digitalio.DigitalInOut(self.DIO1)
-            self.dio1.direction = _direction
-            if _value:
-                self.dio1.direction = _direction
-            self._enable_dio_level_shifters = True
-        else:
-            self.dio1 = None
-
-        if "init_dio2" in self.config and self.config["init_dio2"]:
-            _direction = (
-                digitalio.Direction.INPUT
-                if ("as_input" in self.config["init_dio2"] and
-                    self.config["init_dio2"]["as_input"])
-                else digitalio.Direction.OUTPUT
-            )
-            _value = (
-                self.config["init_dio2"]["value"]
-                if "value" in self.config["init_dio2"]
-                else None
-            )
-            self.dio2 = digitalio.DigitalInOut(self.DIO2)
-            self.dio2.direction = _direction
-            if _value:
-                self.dio2.direction = _direction
-            self._enable_dio_level_shifters = True
-        else:
-            self.dio2 = None
-
-        if "init_dio3" in self.config and self.config["init_dio3"]:
-            _direction = (
-                digitalio.Direction.INPUT
-                if ("as_input" in self.config["init_dio3"] and
-                    self.config["init_dio3"]["as_input"])
-                else digitalio.Direction.OUTPUT
-            )
-            _value = (
-                self.config["init_dio3"]["value"]
-                if "value" in self.config["init_dio3"]
-                else None
-            )
-            self.dio3 = digitalio.DigitalInOut(self.DIO3)
-            self.dio3.direction = _direction
-            if _value:
-                self.dio3.direction = _direction
-            self._enable_dio_level_shifters = True
-        else:
-            self.dio3 = None
+        self.dio0 = self.init_dio("init_dio0", self.DIO0)
+        self.dio1 = self.init_dio("init_dio1", self.DIO1)
+        self.dio2 = self.init_dio("init_dio2", self.DIO2)
+        self.dio3 = self.init_dio("init_dio3", self.DIO3)
 
         # If any of the init_dioX are enable, turn on the level shifters
         if self._enable_dio_level_shifters:
@@ -338,13 +155,13 @@ class CarrierBoard:
         # Configure the analog in (ADC) interfaces, if self.config
         # enables it
         if "init_ain0" in self.config and self.config["init_ain0"]:
-            self.adc0 = analogio.AnalogIn(self.AI0)
+            self.ain0 = analogio.AnalogIn(self.AI0)
         if "init_ain1" in self.config and self.config["init_ain1"]:
-            self.adc1 = analogio.AnalogIn(self.AI1)
+            self.ain1 = analogio.AnalogIn(self.AI1)
         if "init_ain2" in self.config and self.config["init_ain2"]:
-            self.adc2 = analogio.AnalogIn(self.AI2)
+            self.ain2 = analogio.AnalogIn(self.AI2)
         if "init_ain3" in self.config and self.config["init_ain3"]:
-            self.adc3 = analogio.AnalogIn(self.AI3)
+            self.ain3 = analogio.AnalogIn(self.AI3)
 
         # Configure the neopixel interface on, if self.config
         # enables it
@@ -365,34 +182,210 @@ class CarrierBoard:
 
         self.status.on()
 
-    def enable_level_shifter(self) -> None:
+    def disable_level_shifter(self) -> None:
+        self.ls_oe_pin.value = False
+        self.level_shifter_enabled = False
+
+    def enable_level_shifter(self, init_dios=False) -> None:
+        """The digital signal connected to the level shifter output
+        enable is driven high so that the level shifter connects
+        header pin to M4 I/O.
+        :param bool init_dios: if True the four DIOs are configured.
+        :type priority: integer or None
+        :return: None
+        """
         self.ls_oe_pin.value = True
         self.level_shifter_enabled = True
 
         # Initalize the DIOs
-        self.DIO0 = self.init_dio("init_dio0", self.DIO0)
-        self.dio1 = self.init_dio("init_dio1", self.DIO1)
-        self.dio2 = self.init_dio("init_dio2", self.DIO2)
-        self.dio3 = self.init_dio("init_dio3", self.DIO3)
+        if init_dios:
+            if self.dio0 is None:
+                self.dio0 = self.init_dio("init_dio0", self.DIO0)
+            if self.dio1 is None:
+                self.dio1 = self.init_dio("init_dio1", self.DIO1)
+            if self.dio2 is None:
+                self.dio2 = self.init_dio("init_dio2", self.DIO2)
+            if self.dio3 is None:
+                self.dio3 = self.init_dio("init_dio3", self.DIO3)
 
     def init_dio(self, keyname, pin):
         if keyname in self.config and self.config[keyname]:
+            _set_direction = "as_input" in self.config[keyname]
             _direction = (
                 digitalio.Direction.INPUT
-                if ("as_input" in self.config[keyname] and
+                if (_set_direction and
                     self.config[keyname]["as_input"])
                 else digitalio.Direction.OUTPUT
             )
+            _pullup = (
+                ("pullup" in self.config[keyname]) and (
+                        _set_direction and self.config[keyname]["as_input"]
+                    )
+            )
+            _set_value = "value" in self.config[keyname]
             _value = (
                 self.config[keyname]["value"]
-                if "value" in self.config[keyname]
+                if _set_value
                 else None
             )
             _pin = digitalio.DigitalInOut(pin)
-            _pin.direction = _direction
-            if _value:
+            if _set_direction:
+                _pin.direction = _direction
+            if _pullup:
+                _pin.pull = digitalio.Pull.UP
+            if _set_value:
                 _pin.value = _value
             self._enable_dio_level_shifters = True
         else:
             _pin = None
         return _pin
+
+    def init_can(self):
+        # Before creating the canio.CAN interace, check for optional
+        # features
+        _loopback = (
+            self.config["init_can"]["loopback"]
+            if "loopback" in self.config["init_can"]
+            else False
+        )
+
+        _silent = (
+            self.config["init_can"]["silent"]
+            if "silent" in self.config["init_can"]
+            else False
+        )
+
+        _baudrate = (
+            self.config["init_can"]["baudrate"]
+            if "baudrate" in self.config["init_can"]
+            else 1000000
+        )
+
+        _auto_restart = (
+            self.config["init_can"]["auto_restart"]
+            if "auto_restart" in self.config["init_can"]
+            else True
+        )
+
+        _has_listener_match_list = (
+            "listener_match_list" in self.config["init_can"]
+        )
+
+        _listener_match_list = (
+            self.config["init_can"]["listener_match_list"]
+            if _has_listener_match_list
+            else None
+        )
+
+        _timeout = (
+            self.config["init_can"]["timeout"]
+            if "timeout" in self.config["init_can"]
+            else 0.1
+        )
+
+        # Before creating the canio.CAN instance, power up the transceiover
+        # If the CAN transceiver has a standby pin, bring it out of standby
+        # mode
+        if hasattr(board, "CAN_STANDBY"):
+            _standby = digitalio.DigitalInOut(board.CAN_STANDBY)
+            _standby.switch_to_output(False)
+
+        # If the CAN transceiver is powered by a boost converter, turn on
+        # its supply
+        if hasattr(board, "BOOST_ENABLE"):
+            _boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
+            _boost_enable.switch_to_output(True)
+
+        print(f"INFO: Starting canio.CAN with: {_baudrate=} {_loopback=}" +
+              f" {_silent=} {_auto_restart=}")
+        # Now, create the canio.CAN instance in the carrier board class
+        self.can = CAN(
+            rx=board.CAN_RX,
+            tx=board.CAN_TX,
+            baudrate=_baudrate,
+            loopback=_loopback,
+            silent=_silent,
+            auto_restart=_auto_restart,
+        )
+
+        print(f"INFO: Starting canio.CAN.listener with" +
+              f" {_has_listener_match_list=}" +
+              f" {_listener_match_list=} {_timeout=}")
+        # Create a listener, using the match list constructed in the config
+        if _has_listener_match_list:
+            self.listener = self.can.listen(
+                matches=_listener_match_list,
+                timeout=_timeout
+            )
+        else:
+            self.listener = self.can.listen(timeout=_timeout)
+
+    def init_eth(self):
+        # The SPI interface is across fixed pins on the board
+        _cs = digitalio.DigitalInOut(self._ETHSPI_CS)
+        _spi_bus = busio.SPI(self._SCK, MOSI=self._MOSI, MISO=self._MISO)
+
+        # Before creating the WIZNET interace, check for optional features
+        _is_dhcp = (
+            self.config["init_eth"]["is_dhcp"]
+            if "is_dhcp" in self.config["init_eth"]
+            else False
+        )
+
+        _mac = (
+            self.config["init_eth"]["mac"]
+            if "mac" in self.config["init_eth"]
+            else "DE:AD:BE:EF:FE:ED"
+        )
+
+        _hostname = (
+            self.config["init_eth"]["hostname"]
+            if "hostname" in self.config["init_eth"]
+            else None
+        )
+
+        _debug = (
+            self.config["init_eth"]["debug"]
+            if "debug" in self.config["init_eth"]
+            else False
+        )
+
+        _if_config = (
+            self.condif["init_eth"]["if_condig"]
+            if "if_config" in self.config["init_eth"]
+            else False
+        )
+
+        # Now, create the WIZNET instance in the carrier board class
+        self.eth = WIZNET5K(
+            spi_bus=_spi_bus,
+            cs=_cs,
+            is_dhcp=_is_dhcp,
+            mac=_mac,
+            hostname=_hostname,
+            debug=_debug,
+        )
+
+        # Emply a manual interface configuration if we set is_dhcp to false and
+        # if_config is set to a tuple containing:
+        #   (IP_ADDRESS, SUBNET_MASK, GATEWAY_ADDRESS, DNS_SERVER)
+        if not _is_dhcp and _if_config:
+            self.eth.ifconfig = _if_config
+
+    def init_microsd(self):
+        _mount_volumne_name = (
+            self.config["init_microsd"]["mount_as"]
+            if "mount_as" in self.config["init_microsd"]
+            else "/sd"
+        )
+
+        # The microSD uses a SPI interface is across fixed pins on
+        # the board
+        _spi_bus = busio.SPI(self._SCK, MOSI=self._MOSI, MISO=self._MISO)
+
+        # Now, create the sdcardio.SDCard instance in the carrier board
+        # class
+        self.microsd = sdcardio.SDCard(spi=_spi_bus, cs=self._MICRO_SD_CS)
+
+        self.vfs = storage.VfsFat(self.microsd)
+        storage.mount(self.vfs, _mount_volumne_name)
