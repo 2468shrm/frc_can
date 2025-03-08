@@ -493,23 +493,24 @@ class HeartBeatMsg:
     def __str__(self) -> str:
         """String representation of the object's data value."""
         _s = (
-            "Heartbeat data:\n"
-            f" time/date: {self.time_of_day_hr}:"
-            f"{self.time_of_day_min}:"
-            f"{self.time_of_day_sec} "
-            f"{self.time_of_day_day}/"
-            f"{self.time_of_day_month}/"
-            f"{self.time_of_day_year}\n"
-            f" tournament_type: {self.tournament_type}\n"
-            f" system_watchdog: {self.system_watchdog}\n"
-            f" test_mode: {self.test_mode}\n"
-            f" autonomous: {self.autonomous}\n"
-            f" enabled: {self.enabled}\n"
-            f" red_alliance {self.red_alliance}\n"
-            f" replay_number: {self.replay_number}\n"
-            f" match number: {self.match_number}\n"
+            "Heartbeat data:\n" +
+            f" time/date: {self.time_of_day_hr}:" +
+            f"{self.time_of_day_min}:" +
+            f"{self.time_of_day_sec} " +
+            f"{self.time_of_day_day}/" +
+            f"{self.time_of_day_month}/" +
+            f"{self.time_of_day_year}\n" +
+            f" tournament_type: {self.tournament_type}\n" +
+            f" system_watchdog: {self.system_watchdog}\n" +
+            f" test_mode: {self.test_mode}\n" +
+            f" autonomous: {self.autonomous}\n" +
+            f" enabled: {self.enabled}\n" +
+            f" red_alliance {self.red_alliance}\n" +
+            f" replay_number: {self.replay_number}\n" +
+            f" match number: {self.match_number}\n" +
             f" match time: {self.match_time} s"
         )
+
         _s2 = "\n"
         for b in range(8):
             _s2 += f"{self.data[b]:02x}"

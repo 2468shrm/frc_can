@@ -1,9 +1,6 @@
 
 from micropython import const
 
-__version__ = "0.0.0-auto.0"
-__repo__ = "https://github.com/2468shrm/frc_can.git"
-
 
 class FRCCANDevice:
     """These are constants for the MessageID bit field"""
@@ -18,6 +15,11 @@ class FRCCANDevice:
     API_LSB = const(6)
     API_MASK = const(0x3ff)
     API_MASK_ALL = const((API_MASK) << (API_LSB))
+
+    API_CLASS_LSB = const(10)
+    API_CLASS_MASK = const(0x3f)
+    API_CLASS_MASK_ALL = const((API_CLASS_MASK) << (API_CLASS_LSB))
+
     DEVICE_NUMBER_LSB = const(0)
     DEVICE_NUMBER_MASK = const(0x3f)
     DEVICE_NUMBER_MASK_ALL = const((DEVICE_NUMBER_MASK) << (DEVICE_NUMBER_LSB))
@@ -38,6 +40,9 @@ class FRCCANDevice:
     API_MASK_EXTRACT = const(
         (API_MASK_ALL) ^ (MESSAGE_ID_MASK)
     )
+    API_CLASS_MASK_EXTRACT = const(
+        (API_CLASS_MASK_ALL) ^ (MESSAGE_ID_MASK)
+    )
     DEVICE_NUMBER_MASK_EXTRACT = const(
         (DEVICE_NUMBER_MASK_ALL) ^ (MESSAGE_ID_MASK)
     )
@@ -57,12 +62,18 @@ class FRCCANDevice:
     DEVICE_TYPE_IO_BREAKOUT = const(11)
     DEVICE_TYPE_FIRMWARE_UPDATE = const(31)
     DEVICE_TYPE_DECODE = {
-        0: "Broadcast", 1: "Robot Controller",
-        2: "Motor Controller", 3: "Relay Controller",
-        4: "Gyro", 5: "Accelerometer",
-        6: "Ultrasonic", 7: "Geartooth",
-        8: "Power Dist", 9: "Pneumatics Controller",
-        10: "Misc", 11: "IO Breakout",
+        0: "Broadcast",
+        1: "Robot Controller",
+        2: "Motor Controller",
+        3: "Relay Controller",
+        4: "Gyro",
+        5: "Accelerometer",
+        6: "Ultrasonic",
+        7: "Geartooth",
+        8: "Power Dist",
+        9: "Pneumatics Controller",
+        10: "Misc",
+        11: "IO Breakout",
         31: "Firmware Update"
     }
 
@@ -102,6 +113,35 @@ class FRCCANDevice:
         MANUF_REDUX: "Redux",
         MANUF_ANDYMARK: "AndyMark",
         MANUF_VIVID_HOSTING: "Vivid Hosting"
+    }
+
+    # APIs aren't documented here since each manufacturer owns that space
+    # but there is one API which can have some info here.. the broadcast
+    # API
+    API_CLASS_BROADCAST = const(0)
+    API_CLASS_BROADCAST_DISABLE = const(0)
+    API_CLASS_BROADCAST_SYSTEM_HALT = const(1)
+    API_CLASS_BROADCAST_SYSTEM_RESET = const(2)
+    API_CLASS_BROADCAST_DEVICE_ASSIGN = const(3)
+    API_CLASS_BROADCAST_DEVICE_QUERY = const(4)
+    API_CLASS_BROADCAST_HEARTBEAT = const(5)  # Not used anymore
+    API_CLASS_BROADCAST_SYNC = const(6)
+    API_CLASS_BROADCAST_UPDATE = const(7)
+    API_CLASS_BROADCAST_FIRMWARE_VERSION = const(8)
+    API_CLASS_BROADCAST_ENUMERATE = const(9)
+    API_CLASS_BROADCAST_SYSTEM_RESUME = const(10)
+    API_CLASS_BROADCAST_DECODE = {
+        API_CLASS_BROADCAST_DISABLE: "Disable",
+        API_CLASS_BROADCAST_SYSTEM_HALT: "System Halt",
+        API_CLASS_BROADCAST_SYSTEM_RESET: "System Reset",
+        API_CLASS_BROADCAST_DEVICE_ASSIGN: "System Assign",
+        API_CLASS_BROADCAST_DEVICE_QUERY: "Device Query",
+        API_CLASS_BROADCAST_HEARTBEAT: "Heart Beat",
+        API_CLASS_BROADCAST_SYNC: "Sync",
+        API_CLASS_BROADCAST_UPDATE: "Update",
+        API_CLASS_BROADCAST_FIRMWARE_VERSION: "Firmware Version",
+        API_CLASS_BROADCAST_ENUMERATE: "Enumerate",
+        API_CLASS_BROADCAST_SYSTEM_RESUME: "System Resume"
     }
 
     def __init__(self, device_type=None, manufacturer=None, api=None,
@@ -163,6 +203,14 @@ class FRCCANDevice:
         _t = (self._message_id >> self.API_LSB) & self.API_MASK
         return _t
 
+    def _insert_api_class(self, api_class: int) -> None:
+        self._message_id = (self._message_id & self.API_CLASS_MASK_EXTRACT) | \
+            ((api_class & self.API_CLASS_MASK) << self.API_CLASS_LSB)
+
+    def _extract_api_class(self) -> int:
+        _t = (self._message_id >> self.API_CLASS_LSB) & self.API_CLASS_MASK
+        return _t
+
     def _insert_device_number(self, device_number: int) -> None:
         self._message_id = (self._message_id &
                             self.DEVICE_NUMBER_MASK_EXTRACT) | \
@@ -199,6 +247,14 @@ class FRCCANDevice:
         self._insert_api(value)
 
     @property
+    def api_class(self) -> int:
+        return self._extract_api_class()
+
+    @api_class.setter
+    def api_class(self, value):
+        self._insert_api_class(value)
+
+    @property
     def device_number(self) -> int:
         return self._extract_device_number()
 
@@ -225,6 +281,12 @@ class FRCCANDevice:
         if _manufacturer in self.MANUF_DECODE:
             _s += f" ({self.MANUF_DECODE[_manufacturer]})"
 
-        _s += f" api: 0x{self._extract_api():x}"
+        _api = self._extract_api()
+        _s += f" api: 0x{_api:x}"
+        _api_class = self._extract_api_class()
+        if ((_api_class == self.API_CLASS_BROADCAST) and
+                _api in self.API_CLASS_BROADCAST_DECODE):
+            _s += f" ({self.API_CLASS_BROADCAST_DECODE[_api]})"
+
         _s += f" device_number: 0x{self._extract_device_number():x}"
         return _s

@@ -4,12 +4,9 @@ import digitalio
 import busio
 from canio import Message
 
-__version__ = "0.0.0-auto.0"
-__repo__ = "https://github.com/2468shrm/frc_can.git"
-
 
 class CANHandler:
-    def __init__(self, carrier_board, drain_queue=False, timeout=0.1) -> None:
+    def __init__(self, carrier_board, drain_queue=False) -> None:
         """CANHandler provides a convenient framework for building robotics
         applications using Adafruit and Raspberry Pi boards.  They're even
         more useful if the boards are plugged into the Carrier Boards
@@ -25,9 +22,6 @@ class CANHandler:
 
         # Process all received messages during timeout slot
         self.drain_queue = drain_queue
-
-        # timeout
-        self.timeout = timeout
 
         # A table for mapping Messages to a handler function
         self.handler_table = {}
@@ -49,14 +43,11 @@ class CANHandler:
         # set and a message is not received in timeout period
         self.timeout_handler = None
 
-    def send(self, msg) -> None:
-        """Sends a message. Typically used for status transmissions."""
-        self.cb.can.send(msg)
-
     def register_msg_handler(self, message_id, function) -> None:
-        """Adds a function (handler) to process a specific message. These are
-        added to a dict with message_id as key, function reference as value.
-        When a message arrives, if a handler is registered, it is called."""
+        """Adds a function (handler) to process a specific CAN message.
+        These are added to a dict with message_id as key, function
+        reference as value. When a message arrives, if a handler is
+        registered, it is called."""
         if message_id in self.handler_table:
             print("ERROR: Attempting to add MessageID that was"
                   " pre-registered")
@@ -83,10 +74,6 @@ class CANHandler:
         message was not receive during the timeout period. The idea is to
         use this to detect a missing heartbeat message."""
         self.timeout_handler = function
-
-    def set_timeout(self, timeout) -> None:
-        """Be able to change the timeout following the constructor."""
-        self.timeout = timeout
 
     def register_iteration_handler(self, iteration_function) -> None:
         """Setup a function to be called when a CAN message does not
@@ -115,11 +102,11 @@ class CANHandler:
                             self.handler_table[message.id](message)
                         )
                         if return_message:
-                            self.send(return_message)
+                            self.cb.can.send(return_message)
                     # if there is a handler registered for non-matching
                     # msg, call it
                     elif self.unmatched_handler:
-                        self.unmatched_handler()
+                        self.unmatched_handler(message)
                 else:
                     # it is a RemoteTransmissionRequest
                     if message.id in self.rtr_handler_table:
@@ -127,11 +114,11 @@ class CANHandler:
                         return_message = \
                             self.rtr_handler_table[message.id](message)
                         if return_message:
-                            self.send(return_message)
+                            self.cb.can.send(return_message)
                     # if there is a handler registered for non-matching msg,
                     # call it
                     elif self.unmatched_handler:
-                        self.unmatched_handler()
+                        self.unmatched_handler(message)
                 # Leave loop after one iteration if drain_queue is false OR
                 # there is no more messages in the queue.  Otherwise,
                 # continue draining..
@@ -141,12 +128,13 @@ class CANHandler:
                 message = self.cb.listener.receive()
 
         # No message received (ot tiemd out) and a timeout
-        elif message is None and self.timout_handler:
-            self.timeout_handler()
+        elif message is None and self.timeout_handler:
+            self.timeout_handler(message)
 
         # run all of the registered iteration functions, one at a time
         # if any generate a message, send it
-        for func in self.iteration_handler:
-            _message = func()
-            if _message:
-                self.send(_message)
+        if self.iteration_handler:
+            for func in self.iteration_handler:
+                _message = func()
+                if _message:
+                    self.cb.can.send(_message)
